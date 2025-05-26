@@ -1,0 +1,1 @@
+# Model za treniranje

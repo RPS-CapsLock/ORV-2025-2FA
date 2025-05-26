@@ -1,0 +1,1 @@
+# Priprava slik za augmentacijo

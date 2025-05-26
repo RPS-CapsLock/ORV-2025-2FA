@@ -1,0 +1,19 @@
+# Python __pycache__ in kompajlirane datoteke
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualno okolje
+.venv/
+venv/
+
+# Dnevniške in začasne datoteke
+*.log
+*.tmp
+
+# macOS datoteke
+.DS_Store
+
+# Datoteke IDE-jev
+.idea/
+.vscode/
