@@ -95,7 +95,10 @@ def build_model():
     x = inputs
 
     base_model = EfficientNetB0(include_top=False, input_shape=input_shape, weights='imagenet')
-    base_model.trainable = False
+
+    base_model.trainable = True
+    for layer in base_model.layers[:-20]:
+        layer.trainable = False
 
     x = base_model(x)
     x = layers.MaxPooling2D(pool_size=(2, 2))(x)
