@@ -2,6 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dense, Lambda, Concatenate
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
@@ -14,28 +15,36 @@ INPUT_SHAPE = (160, 160, 3)
 EMBEDDING_DIM = 128
 BATCH_SIZE = 32
 EPOCHS = 50
-MARGIN = 0.3
+MARGIN = 0.5
 LFW_PATH = "./lfw"
 
-OPT = 'use'
+OPT = 'train'
 
 @tf.keras.utils.register_keras_serializable()
 def l2_normalize_layer(y):
     return tf.math.l2_normalize(y, axis=1)
 
 def create_embedding_model(input_shape=INPUT_SHAPE, embedding_dim=EMBEDDING_DIM):
-    base_model = MobileNetV2(include_top=False, input_shape=input_shape, weights='imagenet')
+    # base_model = MobileNetV2(include_top=False, input_shape=input_shape, weights='imagenet')
+    base_model = EfficientNetB0(include_top=False, input_shape=input_shape, weights='imagenet')
     base_model.trainable = False
 
+    data_augmentation = tf.keras.Sequential([
+        layers.RandomFlip("horizontal"),
+        layers.RandomRotation(0.1),
+        layers.RandomZoom(0.1)
+    ])
+
     inputs = Input(shape=input_shape)
-    x = base_model(inputs)
+    x = data_augmentation(inputs)
+    x = base_model(x)
     x = GlobalAveragePooling2D()(x)
-    x = Dense(1024)(x)
-    x = layers.Activation('tanh')(x)
-    x = layers.Dropout(0.5)(x)
-    x = Dense(1024)(x)
-    x = layers.Activation('tanh')(x)
-    x = layers.Dropout(0.5)(x)
+    x = Dense(2048)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.Dropout(0.25)(x)
+    x = Dense(2048)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.Dropout(0.25)(x)
     x = Dense(embedding_dim)(x)
     x = Lambda(l2_normalize_layer, output_shape=(embedding_dim,))(x)
     model = Model(inputs, x)
@@ -163,8 +172,8 @@ if OPT == 'train':
 elif OPT == 'use':
     image_path_1 = './test/art.png'
     image_path_2 = './test/art2.png'
-    embedding1 = get_embedding('face_embedding_model.keras', image_path_1)
-    embedding2 = get_embedding('face_embedding_model.keras', image_path_2)
+    embedding1 = get_embedding('face_embedding_model_v2.keras', image_path_1)
+    embedding2 = get_embedding('face_embedding_model_v2.keras', image_path_2)
     print("Embedding vector 1 (128-d):", embedding1)
     print("Embedding vector 2 (128-d):", embedding2)
     print("Embedding vector diff (128-d):", embedding1 - embedding2)
