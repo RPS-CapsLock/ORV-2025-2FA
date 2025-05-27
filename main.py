@@ -16,7 +16,7 @@ EMBEDDING_DIM = 128
 BATCH_SIZE = 32
 EPOCHS = 50
 MARGIN = 0.5
-LFW_PATH = "./lfw"
+LFW_PATH = "./train"
 
 OPT = 'train'
 
@@ -44,9 +44,9 @@ def create_embedding_model(input_shape=INPUT_SHAPE, embedding_dim=EMBEDDING_DIM)
     x = data_augmentation(inputs)
     x = base_model(x)
     x = GlobalAveragePooling2D()(x)
-    x = Dense(256)(x)
+    x = Dense(128)(x)
     x = layers.Activation('relu')(x)
-    x = layers.Dropout(0.4)(x)
+    x = layers.Dropout(0.5)(x)
     x = Dense(embedding_dim)(x)
     x = Lambda(l2_normalize_layer, output_shape=(embedding_dim,))(x)
     model = Model(inputs, x)
