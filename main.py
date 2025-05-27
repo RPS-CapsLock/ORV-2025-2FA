@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dense, Lambda, Concatenate
+from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing import image_dataset_from_directory
 from sklearn.model_selection import train_test_split
@@ -13,7 +14,7 @@ INPUT_SHAPE = (160, 160, 3)
 EMBEDDING_DIM = 128
 BATCH_SIZE = 32
 EPOCHS = 50
-MARGIN = 0.2
+MARGIN = 0.3
 LFW_PATH = "./lfw"
 
 OPT = 'use'
@@ -29,6 +30,12 @@ def create_embedding_model(input_shape=INPUT_SHAPE, embedding_dim=EMBEDDING_DIM)
     inputs = Input(shape=input_shape)
     x = base_model(inputs)
     x = GlobalAveragePooling2D()(x)
+    x = Dense(1024)(x)
+    x = layers.Activation('tanh')(x)
+    x = layers.Dropout(0.5)(x)
+    x = Dense(1024)(x)
+    x = layers.Activation('tanh')(x)
+    x = layers.Dropout(0.5)(x)
     x = Dense(embedding_dim)(x)
     x = Lambda(l2_normalize_layer, output_shape=(embedding_dim,))(x)
     model = Model(inputs, x)
