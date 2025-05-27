@@ -22,11 +22,12 @@ if OPT == 'use':
     TEST = sys.argv[3]
 
 DATA_PATH = f'./{USERID}'
+MISMATCH_PATH = f'./mismatch'
 IMG_SIZE = (64, 64)
 BATCH_SIZE = 32
 NUM_CLASSES = 2
 
-class TrafficSignLoader(tf.keras.utils.Sequence):
+class ImageLoader(tf.keras.utils.Sequence):
     def __init__(self, image_paths, labels, batch_size=32, img_size=(64, 64), augment=False):
         self.image_paths = image_paths
         self.labels = labels
@@ -65,15 +66,22 @@ def load_data():
     image_paths = []
     labels = []
 
-    for label_name in ['match', 'mismatch']:
-        class_path = os.path.join(DATA_PATH, label_name)
-        if not os.path.isdir(class_path):
-            continue
-        label_id = 1 if label_name == 'match' else 0
-        for img_file in os.listdir(class_path):
-            if img_file.lower().endswith(('.png', '.jpg', '.jpeg', '.ppm')):
-                image_paths.append(os.path.join(class_path, img_file))
-                labels.append(label_id)
+    class_path = MISMATCH_PATH
+    for img_file in os.listdir(class_path):
+        if img_file.lower().endswith(('.png', '.jpg', '.jpeg', '.ppm')):
+            image_paths.append(os.path.join(class_path, img_file))
+            labels.append(0)
+
+    class_path = DATA_PATH
+    for img_file in os.listdir(class_path):
+        if img_file.lower().endswith(('.png', '.jpg', '.jpeg', '.ppm')):
+            image_paths.append(os.path.join(class_path, img_file))
+            labels.append(1)
+
+    print("------------------------------------------------------------")
+    print(image_paths)
+    print(labels)
+    print("------------------------------------------------------------")
 
     X_train, X_val, y_train, y_val = train_test_split(
         image_paths, labels, test_size=0.2, random_state=42, stratify=labels
@@ -82,10 +90,21 @@ def load_data():
 
 def build_model():
     inputs = layers.Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
-    x = layers.Conv2D(32, (3, 3), activation='relu')(inputs)
-    x = layers.MaxPooling2D((2, 2))(x)
-    x = layers.Conv2D(64, (3, 3), activation='relu')(x)
-    x = layers.MaxPooling2D((2, 2))(x)
+    x = inputs
+    filters = 32
+    for i in range(5):
+        x = layers.Conv2D(filters, (3, 3), padding='same')(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.Activation('selu')(x)
+
+        x = layers.Conv2D(filters, (3, 3), padding='same')(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.Activation('selu')(x)
+
+        x = layers.MaxPooling2D((2, 2))(x)
+        x = layers.Dropout(0.25)(x)
+
+        filters *= 2
     x = layers.Flatten()(x)
     x = layers.Dense(64, activation='relu')(x)
     x = layers.Dropout(0.5)(x)
@@ -97,8 +116,8 @@ def train_and_evaluate():
     print(f"\nTraining model for user: {USERID}")
     X_train, X_val, y_train, y_val = load_data()
 
-    train_loader = TrafficSignLoader(X_train, y_train, BATCH_SIZE, IMG_SIZE, augment=True)
-    val_loader = TrafficSignLoader(X_val, y_val, BATCH_SIZE, IMG_SIZE, augment=False)
+    train_loader = ImageLoader(X_train, y_train, BATCH_SIZE, IMG_SIZE, augment=True)
+    val_loader = ImageLoader(X_val, y_val, BATCH_SIZE, IMG_SIZE, augment=False)
 
     model = build_model()
     model.compile(
@@ -122,14 +141,6 @@ def train_and_evaluate():
 
     model.save(f'm_{USERID}.keras')
     print(f"Model saved as m_{USERID}.keras")
-
-    plt.plot(history.history['val_accuracy'], label='val accuracy')
-    plt.title('Validation Accuracy')
-    plt.ylabel('Accuracy')
-    plt.xlabel('Epoch')
-    plt.legend()
-    plt.savefig(f'accuracy_{USERID}.png')
-    plt.show()
 
 def predict(image_path):
     model = models.load_model(f'm_{USERID}.keras')

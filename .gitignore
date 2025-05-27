@@ -6,6 +6,7 @@ __pycache__/
 # Virtualno okolje
 .venv/
 venv/
+train/
 
 # Dnevniške in začasne datoteke
 *.log
