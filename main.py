@@ -14,8 +14,8 @@ from tensorflow.keras.callbacks import EarlyStopping
 INPUT_SHAPE = (160, 160, 3)
 EMBEDDING_DIM = 128
 BATCH_SIZE = 32
-EPOCHS = 50
-MARGIN = 0.5
+EPOCHS = 30
+MARGIN = 0.3
 LFW_PATH = "./train"
 
 OPT = 'train'
@@ -36,17 +36,19 @@ def create_embedding_model(input_shape=INPUT_SHAPE, embedding_dim=EMBEDDING_DIM)
 
     data_augmentation = tf.keras.Sequential([
         layers.RandomFlip("horizontal"),
-        layers.RandomRotation(0.1),
-        layers.RandomZoom(0.1)
+        layers.RandomRotation(0.2),
+        layers.RandomZoom(0.2),
+        layers.RandomBrightness(0.2),
+        layers.RandomContrast(0.2),
+        layers.RandomTranslation(0.1, 0.1),
+        layers.RandomCrop(140, 140),
+        layers.Resizing(160, 160)
     ])
 
     inputs = Input(shape=input_shape)
     x = data_augmentation(inputs)
     x = base_model(x)
     x = GlobalAveragePooling2D()(x)
-    x = Dense(128)(x)
-    x = layers.Activation('relu')(x)
-    x = layers.Dropout(0.5)(x)
     x = Dense(embedding_dim)(x)
     x = Lambda(l2_normalize_layer, output_shape=(embedding_dim,))(x)
     model = Model(inputs, x)
@@ -113,7 +115,7 @@ def load_lfw_triplets(lfw_path, input_shape=INPUT_SHAPE):
 
         for i in range(len(images) - 1):
             anchor = images[i]
-            positive = images[i + 1]
+            positive = np.random.choice([img for img in images if img != anchor])
 
             negative_person_dir = np.random.choice([d for d in person_dirs if d != person_dir])
             negative_images = [os.path.join(negative_person_dir, f if isinstance(f, str) else f.decode('utf-8'))
