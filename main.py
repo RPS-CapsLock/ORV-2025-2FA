@@ -24,7 +24,7 @@ if OPT == 'use':
 
 DATA_PATH = f'./{USERID}'
 MISMATCH_PATH = f'./mismatch'
-IMG_SIZE = (64, 64)
+IMG_SIZE = (128, 128)
 BATCH_SIZE = 32
 NUM_CLASSES = 2
 
@@ -95,15 +95,21 @@ def build_model():
     x = inputs
 
     base_model = MobileNetV2(include_top=False, input_shape=input_shape, weights='imagenet')
-    base_model.trainable = False
+    base_model.trainable = True
+    for layer in base_model.layers[:100]:
+        layer.trainable = False
 
     x = base_model(x)
     x = layers.MaxPooling2D(pool_size=(2, 2))(x)
 
     x = layers.Flatten()(x)
-    x = layers.Dense(64, activation='relu')(x)
+    x = layers.Dense(64, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001))(x)
+    x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.5)(x)
-    x = layers.Dense(1, activation='softmax')(x)
+    x = layers.Dense(64, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001))(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(1, activation='sigmoid')(x)
     model = models.Model(inputs=inputs, outputs=x)
     return model
 
@@ -116,7 +122,7 @@ def train_and_evaluate():
 
     model = build_model()
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0005),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
         loss='binary_crossentropy',
         metrics=['accuracy']
     )
