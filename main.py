@@ -103,10 +103,10 @@ def build_model():
     x = layers.MaxPooling2D(pool_size=(2, 2))(x)
 
     x = layers.Flatten()(x)
-    x = layers.Dense(64, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001))(x)
+    x = layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001))(x)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.5)(x)
-    x = layers.Dense(64, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001))(x)
+    x = layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001))(x)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.5)(x)
     x = layers.Dense(1, activation='sigmoid')(x)
