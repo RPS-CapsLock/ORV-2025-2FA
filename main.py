@@ -1,194 +1,150 @@
 import os
+import sys
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.applications import EfficientNetB0
-from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dense, Lambda, Concatenate
-from tensorflow.keras import layers
-from tensorflow.keras.models import Model
-from tensorflow.keras.preprocessing import image_dataset_from_directory
+from tensorflow.keras import layers, models
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
+import albumentations as A
+import cv2
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ReduceLROnPlateau
 
-INPUT_SHAPE = (160, 160, 3)
-EMBEDDING_DIM = 128
+if len(sys.argv) != 3:
+    print("Usage: python script.py <OPT> <USERID>")
+    sys.exit(1)
+
+OPT = sys.argv[1]
+USERID = sys.argv[2]
+
+DATA_PATH = f'./{USERID}'
+IMG_SIZE = (64, 64)
 BATCH_SIZE = 32
-EPOCHS = 30
-MARGIN = 0.3
-LFW_PATH = "./train"
+NUM_CLASSES = 2
 
-OPT = 'train'
+class TrafficSignLoader(tf.keras.utils.Sequence):
+    def __init__(self, image_paths, labels, batch_size=32, img_size=(64, 64), augment=False):
+        self.image_paths = image_paths
+        self.labels = labels
+        self.batch_size = batch_size
+        self.img_size = img_size
+        self.augment = augment
 
-@tf.keras.utils.register_keras_serializable()
-def l2_normalize_layer(y):
-    return tf.math.l2_normalize(y, axis=1)
+        self.augmentation = A.Compose([
+            A.Rotate(limit=10),
+            A.RandomBrightnessContrast(p=0.2),
+            A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=0, p=0.2),
+        ])
 
-def create_embedding_model(input_shape=INPUT_SHAPE, embedding_dim=EMBEDDING_DIM):
-    # base_model = MobileNetV2(include_top=False, input_shape=input_shape, weights='imagenet')
-    base_model = EfficientNetB0(include_top=False, input_shape=input_shape, weights='imagenet')
-    # base_model.trainable = False
+    def __len__(self):
+        return int(np.ceil(len(self.image_paths) / self.batch_size))
 
-    base_model.trainable = True
-    print("num layers:", len(base_model.layers))
-    for layer in base_model.layers[:-20]:
-        layer.trainable = False
+    def __getitem__(self, idx):
+        batch_paths = self.image_paths[idx * self.batch_size:(idx + 1) * self.batch_size]
+        batch_labels = self.labels[idx * self.batch_size:(idx + 1) * self.batch_size]
 
-    data_augmentation = tf.keras.Sequential([
-        layers.RandomFlip("horizontal"),
-        layers.RandomRotation(0.2),
-        layers.RandomZoom(0.2),
-        layers.RandomBrightness(0.2),
-        layers.RandomContrast(0.2),
-        layers.RandomTranslation(0.1, 0.1),
-        layers.RandomCrop(140, 140),
-        layers.Resizing(160, 160)
-    ])
+        batch_images = []
+        for path in batch_paths:
+            img = cv2.imread(path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = cv2.resize(img, self.img_size)
 
-    inputs = Input(shape=input_shape)
-    x = data_augmentation(inputs)
-    x = base_model(x)
-    x = GlobalAveragePooling2D()(x)
-    x = Dense(embedding_dim)(x)
-    x = Lambda(l2_normalize_layer, output_shape=(embedding_dim,))(x)
-    model = Model(inputs, x)
-    return model
+            if self.augment:
+                img = self.augmentation(image=img)['image']
 
-def cosine_similarity(x, y):
-    x = tf.math.l2_normalize(x, axis=1)
-    y = tf.math.l2_normalize(y, axis=1)
-    return tf.reduce_sum(x * y, axis=1)
+            img = img.astype('float32') / 255.0
+            batch_images.append(img)
 
-def triplet_loss(margin=MARGIN):
-    def loss(y_true, y_pred):
-        anchor, positive, negative = (
-            y_pred[:, :EMBEDDING_DIM],
-            y_pred[:, EMBEDDING_DIM:2*EMBEDDING_DIM],
-            y_pred[:, 2*EMBEDDING_DIM:]
-        )
-        pos_sim = cosine_similarity(anchor, positive)
-        neg_sim = cosine_similarity(anchor, negative)
-        basic_loss = neg_sim - pos_sim + margin
-        return tf.reduce_mean(tf.maximum(basic_loss, 0.0))
-    return loss
+        return np.array(batch_images), np.array(batch_labels)
 
-def triplet_accuracy(margin=MARGIN):
-    def metric(y_true, y_pred):
-        anchor, positive, negative = (
-            y_pred[:, :EMBEDDING_DIM],
-            y_pred[:, EMBEDDING_DIM:2*EMBEDDING_DIM],
-            y_pred[:, 2*EMBEDDING_DIM:]
-        )
-        pos_sim = cosine_similarity(anchor, positive)
-        neg_sim = cosine_similarity(anchor, negative)
-        return tf.reduce_mean(tf.cast(pos_sim + margin < neg_sim, tf.float32))
-    return metric
+def load_data():
+    image_paths = []
+    labels = []
 
-
-
-def create_triplet_model(embedding_model, input_shape=INPUT_SHAPE):
-    anchor_input = Input(shape=input_shape, name='anchor_input')
-    positive_input = Input(shape=input_shape, name='positive_input')
-    negative_input = Input(shape=input_shape, name='negative_input')
-
-    anchor_embedding = embedding_model(anchor_input)
-    positive_embedding = embedding_model(positive_input)
-    negative_embedding = embedding_model(negative_input)
-
-    merged_output = Concatenate(axis=1)([anchor_embedding, positive_embedding, negative_embedding])
-    model = Model(inputs=[anchor_input, positive_input, negative_input], outputs=merged_output)
-    return model
-
-
-def load_lfw_triplets(lfw_path, input_shape=INPUT_SHAPE):
-    person_dirs = [os.path.join(lfw_path, d if isinstance(d, str) else d.decode('utf-8'))
-                   for d in os.listdir(lfw_path)
-                   if os.path.isdir(os.path.join(lfw_path, d if isinstance(d, str) else d.decode('utf-8')))]
-    triplets = []
-
-    for person_dir in person_dirs:
-        images = [os.path.join(person_dir, f if isinstance(f, str) else f.decode('utf-8'))
-                  for f in os.listdir(person_dir)
-                  if (f if isinstance(f, str) else f.decode('utf-8')).lower().endswith('.jpg')]
-        if len(images) < 2:
+    for label_name in ['match', 'mismatch']:
+        class_path = os.path.join(DATA_PATH, label_name)
+        if not os.path.isdir(class_path):
             continue
+        label_id = 1 if label_name == 'match' else 0
+        for img_file in os.listdir(class_path):
+            if img_file.lower().endswith(('.png', '.jpg', '.jpeg', '.ppm')):
+                image_paths.append(os.path.join(class_path, img_file))
+                labels.append(label_id)
 
-        for i in range(len(images) - 1):
-            anchor = images[i]
-            positive = np.random.choice([img for img in images if img != anchor])
+    X_train, X_val, y_train, y_val = train_test_split(
+        image_paths, labels, test_size=0.2, random_state=42, stratify=labels
+    )
+    return X_train, X_val, y_train, y_val
 
-            negative_person_dir = np.random.choice([d for d in person_dirs if d != person_dir])
-            negative_images = [os.path.join(negative_person_dir, f if isinstance(f, str) else f.decode('utf-8'))
-                               for f in os.listdir(negative_person_dir)
-                               if (f if isinstance(f, str) else f.decode('utf-8')).lower().endswith('.jpg')]
-            if not negative_images:
-                continue
-            negative = np.random.choice(negative_images)
+def build_model():
+    inputs = layers.Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
+    x = layers.Conv2D(32, (3, 3), activation='relu')(inputs)
+    x = layers.MaxPooling2D((2, 2))(x)
+    x = layers.Conv2D(64, (3, 3), activation='relu')(x)
+    x = layers.MaxPooling2D((2, 2))(x)
+    x = layers.Flatten()(x)
+    x = layers.Dense(64, activation='relu')(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(1, activation='sigmoid')(x)
+    model = models.Model(inputs=inputs, outputs=x)
+    return model
 
-            triplets.append((anchor, positive, negative))
-    return triplets
+def train_and_evaluate():
+    print(f"\nTraining model for user: {USERID}")
+    X_train, X_val, y_train, y_val = load_data()
 
+    train_loader = TrafficSignLoader(X_train, y_train, BATCH_SIZE, IMG_SIZE, augment=True)
+    val_loader = TrafficSignLoader(X_val, y_val, BATCH_SIZE, IMG_SIZE, augment=False)
 
-def preprocess_image(filepath):
-    img = tf.io.read_file(filepath)
-    img = tf.image.decode_jpeg(img, channels=3)
-    img = tf.image.resize(img, INPUT_SHAPE[:2])
-    img = img / 255.0
-    return img
+    model = build_model()
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0005),
+        loss='binary_crossentropy',
+        metrics=['accuracy']
+    )
 
+    callbacks = [
+        TensorBoard(log_dir=f'logs/{USERID}'),
+        EarlyStopping(patience=5, restore_best_weights=True),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, verbose=1)
+    ]
 
-def triplet_generator(triplets, batch_size=BATCH_SIZE):
-    while True:
-        np.random.shuffle(triplets)
-        for i in range(0, len(triplets), batch_size):
-            batch_triplets = triplets[i:i + batch_size]
-            anchor_batch = []
-            positive_batch = []
-            negative_batch = []
-            for anchor_path, positive_path, negative_path in batch_triplets:
-                anchor_batch.append(preprocess_image(anchor_path))
-                positive_batch.append(preprocess_image(positive_path))
-                negative_batch.append(preprocess_image(negative_path))
-            yield (tf.stack(anchor_batch), tf.stack(positive_batch), tf.stack(negative_batch)), np.zeros(len(anchor_batch))
+    history = model.fit(
+        train_loader,
+        validation_data=val_loader,
+        epochs=50,
+        callbacks=callbacks
+    )
 
-def get_embedding(model_path, image_path):
-    embedding_model = tf.keras.models.load_model(model_path, compile=False)
+    model.save(f'm_{USERID}.keras')
+    print(f"Model saved as m_{USERID}.keras")
 
-    img = preprocess_image(image_path)
-    img = tf.expand_dims(img, axis=0)
+    plt.plot(history.history['val_accuracy'], label='val accuracy')
+    plt.title('Validation Accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend()
+    plt.savefig(f'accuracy_{USERID}.png')
+    plt.show()
 
-    embedding = embedding_model.predict(img)[0]
+def predict(image_path):
+    model = models.load_model(f'm_{USERID}.keras')
+    img = cv2.imread(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, IMG_SIZE)
+    img = img.astype('float32') / 255.0
+    img = np.expand_dims(img, axis=0)
 
-    return embedding
-
+    pred = model.predict(img)[0][0]
+    label = 'match' if pred > 0.5 else 'mismatch'
+    confidence = pred if pred > 0.5 else 1 - pred
+    print(f"Prediction: {label} with confidence: {confidence:.2f}")
 
 if OPT == 'train':
-    embedding_model = create_embedding_model()
-    triplet_model = create_triplet_model(embedding_model)
-    triplet_model.compile(optimizer=Adam(0.0001), loss=triplet_loss(), metrics=[triplet_accuracy()])
-
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-
-    triplets = load_lfw_triplets(LFW_PATH)
-    train_triplets, val_triplets = train_test_split(triplets, test_size=0.1, random_state=42)
-
-    train_gen = triplet_generator(train_triplets, batch_size=BATCH_SIZE)
-    val_gen = triplet_generator(val_triplets, batch_size=BATCH_SIZE)
-
-    steps_per_epoch = len(train_triplets) // BATCH_SIZE
-    validation_steps = len(val_triplets) // BATCH_SIZE
-
-    triplet_model.fit(train_gen, validation_data=val_gen, steps_per_epoch=steps_per_epoch,
-                  validation_steps=validation_steps, epochs=EPOCHS, callbacks=[early_stopping])
-
-    embedding_model.save("face_embedding_model.keras")
-    print("Embedding model saved!")
-
+    train_and_evaluate()
 elif OPT == 'use':
-    image_path_1 = './test/art.png'
-    image_path_2 = './test/art2.png'
-    embedding1 = get_embedding('face_embedding_model_v2.keras', image_path_1)
-    embedding2 = get_embedding('face_embedding_model_v2.keras', image_path_2)
-    print("Embedding vector 1 (128-d):", embedding1)
-    print("Embedding vector 2 (128-d):", embedding2)
-    print("Embedding vector diff (128-d):", embedding1 - embedding2)
+    test_image = input("Enter path to the test image: ")
+    predict(test_image)
+else:
+    print("Invalid OPT. Use 'train' or 'use'.")
