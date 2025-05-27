@@ -25,14 +25,14 @@ def l2_normalize_layer(y):
     return tf.math.l2_normalize(y, axis=1)
 
 def create_embedding_model(input_shape=INPUT_SHAPE, embedding_dim=EMBEDDING_DIM):
-    base_model = MobileNetV2(include_top=False, input_shape=input_shape, weights='imagenet')
-    # base_model = EfficientNetB0(include_top=False, input_shape=input_shape, weights='imagenet')
-    base_model.trainable = False
+    # base_model = MobileNetV2(include_top=False, input_shape=input_shape, weights='imagenet')
+    base_model = EfficientNetB0(include_top=False, input_shape=input_shape, weights='imagenet')
+    # base_model.trainable = False
 
-    # base_model.trainable = True
-    # print("num layers:", len(base_model.layers))
-    # for layer in base_model.layers[:-20]:
-    #     layer.trainable = False
+    base_model.trainable = True
+    print("num layers:", len(base_model.layers))
+    for layer in base_model.layers[:-20]:
+        layer.trainable = False
 
     data_augmentation = tf.keras.Sequential([
         layers.RandomFlip("horizontal"),
