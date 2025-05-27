@@ -11,12 +11,15 @@ import albumentations as A
 import cv2
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ReduceLROnPlateau
 
-if len(sys.argv) != 3:
-    print("Usage: python script.py <OPT> <USERID>")
+if len(sys.argv) < 3 or len(sys.argv) > 4:
+    print("Usage: python script.py <OPT> <USERID> <TEST>")
     sys.exit(1)
 
 OPT = sys.argv[1]
 USERID = sys.argv[2]
+TEST = ""
+if OPT == 'use':
+    TEST = sys.argv[3]
 
 DATA_PATH = f'./{USERID}'
 IMG_SIZE = (64, 64)
@@ -144,7 +147,6 @@ def predict(image_path):
 if OPT == 'train':
     train_and_evaluate()
 elif OPT == 'use':
-    test_image = input("Enter path to the test image: ")
-    predict(test_image)
+    predict(TEST)
 else:
     print("Invalid OPT. Use 'train' or 'use'.")
