@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 import albumentations as A
 import cv2
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.applications import MobileNetV2
 
 if len(sys.argv) < 3 or len(sys.argv) > 4:
     print("Usage: python script.py <OPT> <USERID> <TEST>")
@@ -94,11 +94,8 @@ def build_model():
     inputs = layers.Input(shape=input_shape)
     x = inputs
 
-    base_model = EfficientNetB0(include_top=False, input_shape=input_shape, weights='imagenet')
-
-    base_model.trainable = True
-    for layer in base_model.layers[:-20]:
-        layer.trainable = False
+    base_model = MobileNetV2(include_top=False, input_shape=input_shape, weights='imagenet')
+    base_model.trainable = False
 
     x = base_model(x)
     x = layers.MaxPooling2D(pool_size=(2, 2))(x)
@@ -106,7 +103,7 @@ def build_model():
     x = layers.Flatten()(x)
     x = layers.Dense(64, activation='relu')(x)
     x = layers.Dropout(0.5)(x)
-    x = layers.Dense(1, activation='sigmoid')(x)
+    x = layers.Dense(1, activation='softmax')(x)
     model = models.Model(inputs=inputs, outputs=x)
     return model
 
@@ -127,7 +124,7 @@ def train_and_evaluate():
     callbacks = [
         TensorBoard(log_dir=f'logs/{USERID}'),
         EarlyStopping(patience=5, restore_best_weights=True),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, verbose=1)
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, verbose=1)
     ]
 
     history = model.fit(
