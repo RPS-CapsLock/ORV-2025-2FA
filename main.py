@@ -20,49 +20,6 @@ LFW_PATH = "./train"
 
 OPT = 'train'
 
-
-def compute_embeddings(embedding_model, image_paths):
-    embeddings = {}
-    for path in image_paths:
-        img = preprocess_image(path)
-        img = tf.expand_dims(img, axis=0)
-        embedding = embedding_model.predict(img)[0]
-        embeddings[path] = embedding
-    return embeddings
-
-
-def load_lfw_triplets_semi_hard(lfw_path, embedding_model, margin=MARGIN):
-    person_dirs = [os.path.join(lfw_path, d) for d in os.listdir(lfw_path) if os.path.isdir(os.path.join(lfw_path, d))]
-    all_images = []
-    for person_dir in person_dirs:
-        images = [os.path.join(person_dir, f) for f in os.listdir(person_dir) if f.lower().endswith('.jpg')]
-        all_images.extend(images)
-
-    print("Computing embeddings for semi-hard mining...")
-    embeddings = compute_embeddings(embedding_model, all_images)
-
-    triplets = []
-    for person_dir in person_dirs:
-        images = [os.path.join(person_dir, f) for f in os.listdir(person_dir) if f.lower().endswith('.jpg')]
-        if len(images) < 2:
-            continue
-        for i in range(len(images) - 1):
-            anchor_path = images[i]
-            positive_path = images[i + 1]
-            anchor_emb = embeddings[anchor_path]
-            positive_emb = embeddings[positive_path]
-            pos_dist = np.sum(np.square(anchor_emb - positive_emb))
-
-            for neg_path, neg_emb in embeddings.items():
-                if neg_path in images:
-                    continue
-                neg_dist = np.sum(np.square(anchor_emb - neg_emb))
-                if pos_dist < neg_dist < pos_dist + margin:
-                    triplets.append((anchor_path, positive_path, neg_path))
-                    break
-    return triplets
-
-
 @tf.keras.utils.register_keras_serializable()
 def l2_normalize_layer(y):
     return tf.math.l2_normalize(y, axis=1)
@@ -95,25 +52,36 @@ def create_embedding_model(input_shape=INPUT_SHAPE, embedding_dim=EMBEDDING_DIM)
     model = Model(inputs, x)
     return model
 
-def triplet_accuracy(margin=MARGIN):
-    def metric(y_true, y_pred):
-        anchor, positive, negative = y_pred[:, 0:EMBEDDING_DIM], y_pred[:, EMBEDDING_DIM:2 * EMBEDDING_DIM], y_pred[:, 2 * EMBEDDING_DIM:]
-        pos_dist = tf.reduce_sum(tf.square(anchor - positive), axis=1)
-        neg_dist = tf.reduce_sum(tf.square(anchor - negative), axis=1)
-        return tf.reduce_mean(tf.cast(pos_dist + margin < neg_dist, tf.float32))
-    return metric
-
+def cosine_similarity(x, y):
+    x = tf.math.l2_normalize(x, axis=1)
+    y = tf.math.l2_normalize(y, axis=1)
+    return tf.reduce_sum(x * y, axis=1)
 
 def triplet_loss(margin=MARGIN):
     def loss(y_true, y_pred):
-        anchor, positive, negative = y_pred[:, 0:EMBEDDING_DIM], y_pred[:, EMBEDDING_DIM:2 * EMBEDDING_DIM], y_pred[:,
-                                                                                                             2 * EMBEDDING_DIM:]
-        pos_dist = tf.reduce_sum(tf.square(anchor - positive), axis=1)
-        neg_dist = tf.reduce_sum(tf.square(anchor - negative), axis=1)
-        basic_loss = pos_dist - neg_dist + margin
+        anchor, positive, negative = (
+            y_pred[:, :EMBEDDING_DIM],
+            y_pred[:, EMBEDDING_DIM:2*EMBEDDING_DIM],
+            y_pred[:, 2*EMBEDDING_DIM:]
+        )
+        pos_sim = cosine_similarity(anchor, positive)
+        neg_sim = cosine_similarity(anchor, negative)
+        basic_loss = neg_sim - pos_sim + margin
         return tf.reduce_mean(tf.maximum(basic_loss, 0.0))
-
     return loss
+
+def triplet_accuracy(margin=MARGIN):
+    def metric(y_true, y_pred):
+        anchor, positive, negative = (
+            y_pred[:, :EMBEDDING_DIM],
+            y_pred[:, EMBEDDING_DIM:2*EMBEDDING_DIM],
+            y_pred[:, 2*EMBEDDING_DIM:]
+        )
+        pos_sim = cosine_similarity(anchor, positive)
+        neg_sim = cosine_similarity(anchor, negative)
+        return tf.reduce_mean(tf.cast(pos_sim + margin < neg_sim, tf.float32))
+    return metric
+
 
 
 def create_triplet_model(embedding_model, input_shape=INPUT_SHAPE):
@@ -199,9 +167,7 @@ if OPT == 'train':
 
     early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
-    # triplets = load_lfw_triplets(LFW_PATH)
-    embedding_model = create_embedding_model()
-    triplets = load_lfw_triplets_semi_hard(LFW_PATH, embedding_model, margin=MARGIN)
+    triplets = load_lfw_triplets(LFW_PATH)
     train_triplets, val_triplets = train_test_split(triplets, test_size=0.1, random_state=42)
 
     train_gen = triplet_generator(train_triplets, batch_size=BATCH_SIZE)
