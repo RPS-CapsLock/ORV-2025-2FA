@@ -21,3 +21,11 @@ def dodaj_gaussov_sum(slika, sigma=25):
     suma_slika = np.clip(suma_slika, 0, 255)
 
     return suma_slika.astype(np.uint8)
+
+def spremeni_kontrast(slika, faktor):
+    slika = slika.astype(np.float32)
+    sredina = 127
+    nova_slika = (slika - sredina) * faktor + sredina
+    nova_slika = np.clip(nova_slika, 0, 255)
+
+    return nova_slika.astype(np.uint8)
