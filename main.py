@@ -1,16 +1,17 @@
 import os
 import sys
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import tensorflow as tf
+from sklearn.utils import compute_class_weight
 from tensorflow.keras import layers, models
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_curve
 import albumentations as A
 import cv2
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.applications import MobileNetV2
+import joblib
+from tqdm import tqdm
 
 if len(sys.argv) < 3 or len(sys.argv) > 4:
     print("Usage: python script.py <OPT> <USERID> <TEST>")
@@ -25,8 +26,8 @@ if OPT == 'use':
 DATA_PATH = f'./{USERID}'
 MISMATCH_PATH = f'./mismatch'
 IMG_SIZE = (128, 128)
-BATCH_SIZE = 32
-NUM_CLASSES = 2
+BATCH_SIZE = 5
+
 
 class ImageLoader(tf.keras.utils.Sequence):
     def __init__(self, image_paths, labels, batch_size=32, img_size=(64, 64), augment=False):
@@ -35,7 +36,6 @@ class ImageLoader(tf.keras.utils.Sequence):
         self.batch_size = batch_size
         self.img_size = img_size
         self.augment = augment
-
         self.augmentation = A.Compose([
             A.Rotate(limit=10),
             A.RandomBrightnessContrast(p=0.2),
@@ -46,105 +46,119 @@ class ImageLoader(tf.keras.utils.Sequence):
         return int(np.ceil(len(self.image_paths) / self.batch_size))
 
     def __getitem__(self, idx):
-        batch_paths = self.image_paths[idx * self.batch_size:(idx + 1) * self.batch_size]
-        batch_labels = self.labels[idx * self.batch_size:(idx + 1) * self.batch_size]
-
+        start = idx * self.batch_size
+        end = min((idx + 1) * self.batch_size, len(self.image_paths))
+        if start >= len(self.image_paths):
+            raise IndexError("Batch index out of range")
+        batch_paths = self.image_paths[start:end]
+        batch_labels = self.labels[start:end]
         batch_images = []
         for path in batch_paths:
             img = cv2.imread(path)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img = cv2.resize(img, self.img_size)
-
             if self.augment:
                 img = self.augmentation(image=img)['image']
-
             img = img.astype('float32') / 255.0
             batch_images.append(img)
-
         return np.array(batch_images), np.array(batch_labels)
 
+
 def load_data():
-    image_paths = []
-    labels = []
-
-    class_path = MISMATCH_PATH
-    for img_file in os.listdir(class_path):
+    image_paths, labels = [], []
+    for img_file in os.listdir(MISMATCH_PATH):
         if img_file.lower().endswith(('.png', '.jpg', '.jpeg', '.ppm')):
-            image_paths.append(os.path.join(class_path, img_file))
+            image_paths.append(os.path.join(MISMATCH_PATH, img_file))
             labels.append(0)
-
-    class_path = DATA_PATH
-    for img_file in os.listdir(class_path):
+    for img_file in os.listdir(DATA_PATH):
         if img_file.lower().endswith(('.png', '.jpg', '.jpeg', '.ppm')):
-            image_paths.append(os.path.join(class_path, img_file))
+            image_paths.append(os.path.join(DATA_PATH, img_file))
             labels.append(1)
-
-    print("------------------------------------------------------------")
-    print(image_paths)
-    print(labels)
-    print("------------------------------------------------------------")
-
     X_train, X_val, y_train, y_val = train_test_split(
-        image_paths, labels, test_size=0.2, random_state=42, stratify=labels
-    )
+        image_paths, labels, test_size=0.2, random_state=42, stratify=labels)
     return X_train, X_val, y_train, y_val
+
 
 def build_model():
     input_shape = (IMG_SIZE[0], IMG_SIZE[1], 3)
     inputs = layers.Input(shape=input_shape)
-    x = inputs
-
     base_model = MobileNetV2(include_top=False, input_shape=input_shape, weights='imagenet')
     base_model.trainable = True
     for layer in base_model.layers[:100]:
         layer.trainable = False
-
-    x = base_model(x)
-    x = layers.MaxPooling2D(pool_size=(2, 2))(x)
-
-    x = layers.Flatten()(x)
-    x = layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001))(x)
+    x = base_model(inputs)
+    x = layers.GlobalAveragePooling2D()(x)
+    x = layers.Dense(128, activation='relu')(x)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.5)(x)
-    x = layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001))(x)
-    x = layers.BatchNormalization()(x)
+    x = layers.Dense(64, activation='relu')(x)
     x = layers.Dropout(0.5)(x)
     x = layers.Dense(1, activation='sigmoid')(x)
-    model = models.Model(inputs=inputs, outputs=x)
-    return model
+    return models.Model(inputs=inputs, outputs=x)
+
 
 def train_and_evaluate():
     print(f"\nTraining model for user: {USERID}")
     X_train, X_val, y_train, y_val = load_data()
 
+    print(f"Train size: {len(X_train)}, Validation size: {len(X_val)}")
+
     train_loader = ImageLoader(X_train, y_train, BATCH_SIZE, IMG_SIZE, augment=True)
     val_loader = ImageLoader(X_val, y_val, BATCH_SIZE, IMG_SIZE, augment=False)
 
     model = build_model()
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
-        loss='binary_crossentropy',
-        metrics=['accuracy']
-    )
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=2e-5),
+                  loss='binary_crossentropy', metrics=['accuracy'])
 
-    callbacks = [
-        TensorBoard(log_dir=f'logs/{USERID}'),
-        EarlyStopping(patience=5, restore_best_weights=True),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, verbose=1)
-    ]
+    callbacks = [TensorBoard(log_dir=f'logs/{USERID}'),
+                 EarlyStopping(patience=10, restore_best_weights=True),
+                 ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, verbose=1)]
 
-    history = model.fit(
-        train_loader,
-        validation_data=val_loader,
-        epochs=50,
-        callbacks=callbacks
-    )
+    class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y_train), y=y_train)
+    class_weight_dict = {i: class_weights[i] for i in range(len(class_weights))}
+
+    steps_per_epoch = len(train_loader)
+    validation_steps = len(val_loader)
+    print(f"Train batches: {steps_per_epoch}, Validation batches: {validation_steps}")
+
+    model.fit(train_loader, validation_data=val_loader, epochs=150,
+              callbacks=callbacks, class_weight=class_weight_dict,
+              steps_per_epoch=steps_per_epoch, validation_steps=validation_steps)
 
     model.save(f'm_{USERID}.keras')
     print(f"Model saved as m_{USERID}.keras")
 
+    val_preds, val_labels = [], []
+    for batch_x, batch_y in tqdm(val_loader, total=validation_steps, desc="Predicting validation batches"):
+        preds = model.predict(batch_x, verbose=0).flatten()
+        val_preds.extend(preds)
+        val_labels.extend(batch_y)
+
+    if len(val_preds) == 0:
+        print("No valid predictions made. Check data or model.")
+        return
+
+    val_preds = np.array(val_preds)
+    val_labels = np.array(val_labels)
+
+    fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
+    optimal_idx = np.argmax(tpr - fpr)
+    optimal_threshold = thresholds[optimal_idx]
+    if optimal_threshold < 0.5:
+        optimal_threshold = 0.5
+    print(f"Optimal threshold: {optimal_threshold}")
+    joblib.dump(optimal_threshold, f'm_{USERID}_threshold.pkl')
+    print(f"Saved threshold as m_{USERID}_threshold.pkl")
+
 def predict(image_path):
     model = models.load_model(f'm_{USERID}.keras')
+    try:
+        optimal_threshold = joblib.load(f'm_{USERID}_threshold.pkl')
+        print(f"Using saved threshold: {optimal_threshold}")
+    except:
+        optimal_threshold = 0.5
+        print("Threshold file not found. Using default threshold 0.5")
+
     img = cv2.imread(image_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = cv2.resize(img, IMG_SIZE)
@@ -152,9 +166,10 @@ def predict(image_path):
     img = np.expand_dims(img, axis=0)
 
     pred = model.predict(img)[0][0]
-    label = 'match' if pred > 0.5 else 'mismatch'
-    confidence = pred if pred > 0.5 else 1 - pred
+    label = 'match' if pred > optimal_threshold else 'mismatch'
+    confidence = pred if pred > optimal_threshold else 1 - pred
     print(f"Prediction: {label} with confidence: {confidence:.2f}")
+
 
 if OPT == 'train':
     train_and_evaluate()
