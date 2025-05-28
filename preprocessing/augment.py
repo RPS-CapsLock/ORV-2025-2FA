@@ -29,3 +29,24 @@ def spremeni_kontrast(slika, faktor):
     nova_slika = np.clip(nova_slika, 0, 255)
 
     return nova_slika.astype(np.uint8)
+
+def add_shadow_simple(img):
+    img_shadow = img.copy()
+    h, w = img.shape[:2]
+
+    if random.choice(['horizontal', 'vertical']) == 'horizontal':
+        y1 = random.randint(0, h // 2)
+        y2 = y1 + random.randint(h // 8, h // 3)
+        if len(img.shape) == 2:
+            img_shadow[y1:y2, :] = (img_shadow[y1:y2, :] * 0.5).astype(np.uint8)
+        else:
+            img_shadow[y1:y2, :, :] = (img_shadow[y1:y2, :, :] * 0.5).astype(np.uint8)
+    else:
+        x1 = random.randint(0, w // 2)
+        x2 = x1 + random.randint(w // 8, w // 3)
+        if len(img.shape) == 2:
+            img_shadow[:, x1:x2] = (img_shadow[:, x1:x2] * 0.5).astype(np.uint8)
+        else:
+            img_shadow[:, x1:x2, :] = (img_shadow[:, x1:x2, :] * 0.5).astype(np.uint8)
+
+    return img_shadow
