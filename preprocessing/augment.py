@@ -50,3 +50,20 @@ def add_shadow_simple(img):
             img_shadow[:, x1:x2, :] = (img_shadow[:, x1:x2, :] * 0.5).astype(np.uint8)
 
     return img_shadow
+
+if __name__ == '__main__':
+    slika = cv.imread("../data/raw/test_face.png")
+
+    rotirana = rotiraj_random(slika, max_kot=15)
+    z_sumom = dodaj_gaussov_sum(slika, sigma=25)
+    kontrastirana = spremeni_kontrast(slika, 1.5)
+    senca = add_shadow_simple(slika)
+
+    cv.imshow('Original', slika)
+    cv.imshow('Rotirana', rotirana)
+    cv.imshow('Gaussov sum', z_sumom)
+    cv.imshow('Kontrast', kontrastirana)
+    cv.imshow('Senca', senca)
+
+    cv.waitKey(0)
+    cv.destroyAllWindows()
