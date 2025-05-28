@@ -13,3 +13,11 @@ def rotiraj_random(slika, max_kot=15):
                              flags=cv.INTER_LINEAR, borderMode=cv.BORDER_REFLECT)
 
     return rotirana
+
+def dodaj_gaussov_sum(slika, sigma=25):
+    slika = slika.astype(np.float32)
+    gauss = np.random.normal(0, sigma, slika.shape).astype(np.float32)
+    suma_slika = slika + gauss
+    suma_slika = np.clip(suma_slika, 0, 255)
+
+    return suma_slika.astype(np.uint8)
