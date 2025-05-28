@@ -32,3 +32,13 @@ def filtriraj_z_gaussovim_jedrom(slika, sigma):
 
     jedro /= np.sum(jedro)
     return konvolucija(slika, jedro)
+
+def linearizacija_sivin(slika):
+    min_val = np.min(slika)
+    max_val = np.max(slika)
+    if max_val - min_val == 0:
+        return slika.copy()
+
+    raztegnjena = (slika - min_val) * (255.0 / (max_val - min_val))
+
+    return raztegnjena.astype(np.uint8)
