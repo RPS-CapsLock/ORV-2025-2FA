@@ -42,3 +42,25 @@ def linearizacija_sivin(slika):
     raztegnjena = (slika - min_val) * (255.0 / (max_val - min_val))
 
     return raztegnjena.astype(np.uint8)
+
+if __name__ == '__main__':
+    slika_rgb = cv.imread("../data/raw/test_face.png")
+
+    slika = cv.cvtColor(slika_rgb, cv.COLOR_BGR2GRAY)
+    slika_hsv = cv.cvtColor(slika_rgb, cv.COLOR_BGR2HSV)
+
+    gauss = filtriraj_z_gaussovim_jedrom(slika, 1)
+    gauss = cv.normalize(gauss, None, 0, 255, cv.NORM_MINMAX)
+    gauss = gauss.astype(np.uint8)
+
+    linearizirana = linearizacija_sivin(gauss)
+
+    hsv_to_bgr = cv.cvtColor(slika_hsv, cv.COLOR_HSV2BGR)
+
+    cv.imshow('Original Gray', slika)
+    cv.imshow('Po Gaussu', gauss)
+    cv.imshow('Po Linearizaciji', linearizirana)
+    cv.imshow('HSV (v BGR)', hsv_to_bgr)
+
+    cv.waitKey(0)
+    cv.destroyAllWindows()
