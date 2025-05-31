@@ -4,4 +4,6 @@ import base64
 import io
 import os
 
+app = Flask(__name__)
+
 def get_image():
