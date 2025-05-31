@@ -8,6 +8,10 @@ app = Flask(__name__)
 
 known_image = face_recognition.load_image_file("known_face.jpg")
 
+def recognize_face(incoming_image):
+    pass
+
 
 @app.route("/verify", methods=["POST"])
 def verify():
+    pass
