@@ -6,4 +6,4 @@ import os
 
 app = Flask(__name__)
 
-def get_image():
+known_image = face_recognition.load_image_file("known_face.jpg")
