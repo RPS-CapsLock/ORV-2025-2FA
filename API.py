@@ -14,10 +14,23 @@ known_image = face_recognition.load_image_file("known_face.jpg")
 def process_info_for_f2a():
     pass
 
-def recognize_face(incoming_image):
+def recognize_face(user_id, incoming_image):
     temp_filename = f"temp_{uuid.uuid4().hex}.jpg"
     incoming_image.save(temp_filename)
-    pass
+    try:
+        result = subprocess.run(
+            ['python', 'script.py', 'use', user_id, temp_filename],
+            capture_output=True, text=True
+        )
+        output = result.stdout.strip()
+        print(f"Script output:\n{output}")
+
+        if "match" in output:
+            return True
+        elif "mismatch" in output:
+            return False
+        else:
+            return None
 
 
 @app.route("/verify", methods=["POST"])
