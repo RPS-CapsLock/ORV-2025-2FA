@@ -41,4 +41,7 @@ def verify():
     data = request.get_json()
     image_b64 = data.get("image")
     user_id = data.get("user_id")
+
+    if not image_b64 or not user_id:
+        return jsonify({"error": "Missing image or user_id"}), 400
     pass
