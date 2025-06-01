@@ -38,4 +38,7 @@ def recognize_face(user_id, incoming_image):
 
 @app.route("/verify", methods=["POST"])
 def verify():
+    data = request.get_json()
+    image_b64 = data.get("image")
+    user_id = data.get("user_id")
     pass
