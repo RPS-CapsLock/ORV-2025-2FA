@@ -3,6 +3,9 @@ import numpy as np
 import base64
 import io
 import os
+import main as face_recognition
+import subprocess
+import uuid
 
 app = Flask(__name__)
 
@@ -12,6 +15,8 @@ def process_info_for_f2a():
     pass
 
 def recognize_face(incoming_image):
+    temp_filename = f"temp_{uuid.uuid4().hex}.jpg"
+    incoming_image.save(temp_filename)
     pass
 
 
