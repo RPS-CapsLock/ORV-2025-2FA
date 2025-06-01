@@ -44,4 +44,19 @@ def verify():
 
     if not image_b64 or not user_id:
         return jsonify({"error": "Missing image or user_id"}), 400
+    try:
+        # Decode base64 to image
+        image_data = base64.b64decode(image_b64)
+        image = io.BytesIO(image_data)
+        from PIL import Image
+        incoming_image = Image.open(image).convert("RGB")
+
+        # Call recognition logic
+        result = recognize_face(user_id, incoming_image)
+        if result is None:
+            return jsonify({"error": "Recognition failed"}), 500
+
+        return jsonify({"verified": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     pass
