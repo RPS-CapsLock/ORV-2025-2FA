@@ -31,6 +31,9 @@ def recognize_face(user_id, incoming_image):
             return False
         else:
             return None
+    finally:
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
 
 
 @app.route("/verify", methods=["POST"])
