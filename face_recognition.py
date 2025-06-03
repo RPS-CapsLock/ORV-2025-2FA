@@ -12,6 +12,7 @@ from tensorflow.keras.applications import MobileNetV2
 import joblib
 from tqdm import tqdm
 from util.image_loader import ImageLoader
+from preprocessing.run_prep_aug import procesiraj_in_augmetiraj
 
 IMG_SIZE = (128, 128)
 BATCH_SIZE = 5
@@ -122,6 +123,11 @@ def predict(image_path, user_id):
 
 def train(user_id):
     data_path = f'./{user_id}'
+
+    input_dir = data_path
+    output_dir = f'./augmented/{user_id}'
+    procesiraj_in_augmetiraj(input_dir, output_dir)
+
     train_and_evaluate(user_id, data_path)
 
 def use(user_id, test_p):
