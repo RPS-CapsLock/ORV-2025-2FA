@@ -11,7 +11,11 @@ app = Flask(__name__)
 
 known_image = face_recognition.load_image_file("known_face.jpg")
 
-def process_info_for_f2a():
+def process_info_for_f2a(incoming_image):
+    temp_input_filename = f"input_{uuid.uuid4().hex}.jpg"
+    temp_output_filename = f"output_{uuid.uuid4().hex}.jpg"
+
+    incoming_image.save(temp_input_filename)
     pass
 
 def recognize_face(user_id, incoming_image):
@@ -45,13 +49,11 @@ def verify():
     if not image_b64 or not user_id:
         return jsonify({"error": "Missing image or user_id"}), 400
     try:
-        # Decode base64 to image
         image_data = base64.b64decode(image_b64)
         image = io.BytesIO(image_data)
         from PIL import Image
         incoming_image = Image.open(image).convert("RGB")
 
-        # Call recognition logic
         result = recognize_face(user_id, incoming_image)
         if result is None:
             return jsonify({"error": "Recognition failed"}), 500
@@ -59,4 +61,3 @@ def verify():
         return jsonify({"verified": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    pass
