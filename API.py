@@ -16,10 +16,7 @@ def recognize_face(user_id, incoming_image):
     temp_filename = f"temp_{uuid.uuid4().hex}.jpg"
     incoming_image.save(temp_filename)
     try:
-        result = subprocess.run(
-            ['python', 'main.py', 'use', user_id, temp_filename],
-            capture_output=True, text=True
-        )
+        result = face_recognition.use()
         output = result.stdout.strip()
         print(f"Script output:\n{output}")
 
@@ -79,10 +76,7 @@ def train():
             img = Image.open(image).convert("RGB")
             img.save(os.path.join(user_folder, f"user_{i}.jpg"))
 
-        result = subprocess.run(
-            ['python', 'main.py', 'train', user_id],
-            capture_output=True, text=True
-        )
+        result = face_recognition.train(user_id, user_folder)
         print(result.stdout)
         print(result.stderr)
 
