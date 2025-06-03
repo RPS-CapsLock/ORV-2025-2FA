@@ -34,7 +34,10 @@ def process_info_for_f2a(incoming_image):
     except Exception as e:
         print(f"Exception in process_info_for_f2a: {e}")
         return None
-    pass
+    finally:
+        for file in [temp_input_filename, temp_output_filename]:
+            if os.path.exists(file):
+                os.remove(file)
 
 def recognize_face(user_id, incoming_image):
     temp_filename = f"temp_{uuid.uuid4().hex}.jpg"
