@@ -17,7 +17,6 @@ def process_info_for_f2a(incoming_image):
 
     incoming_image.save(temp_input_filename)
     try:
-        # Call the mod.py script to process the image
         result = subprocess.run(
             ['python', 'mod.py', temp_input_filename, temp_output_filename],
             capture_output=True,
@@ -27,12 +26,14 @@ def process_info_for_f2a(incoming_image):
             print(f"mod.py error:\n{result.stderr}")
             return None
 
-        # Load the processed image
         from PIL import Image
         with open(temp_output_filename, 'rb') as f:
             processed_image = Image.open(f).convert("RGB")
 
         return processed_image
+    except Exception as e:
+        print(f"Exception in process_info_for_f2a: {e}")
+        return None
     pass
 
 def recognize_face(user_id, incoming_image):
