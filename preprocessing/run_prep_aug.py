@@ -21,24 +21,24 @@ def procesiraj_in_augmetiraj(input_dir, output_dir):
         filtrirana = cv.normalize(filtrirana, None, 0, 255, cv.NORM_MINMAX).astype('uint8')
         linearizirana = linearizacija_sivin(filtrirana)
 
-        out_path = os.path.join(output_dir, 'original', slika_ime)
-        cv.imwrite(out_path, linearizirana)
-
-        rotirana = rotiraj_random(linearizirana, max_kot=15)
-        out_path = os.path.join(output_dir, 'rotacija', slika_ime)
-        cv.imwrite(out_path, rotirana)
-
-        suma_slika = dodaj_gaussov_sum(linearizirana, sigma=25)
-        out_path = os.path.join(output_dir, 'sum', slika_ime)
-        cv.imwrite(out_path, suma_slika)
-
-        kontrastirana = spremeni_kontrast(linearizirana, 1.5)
-        out_path = os.path.join(output_dir, 'kontrast', slika_ime)
-        cv.imwrite(out_path, kontrastirana)
-
-        senca = add_shadow_simple(linearizirana)
-        out_path = os.path.join(output_dir, 'senca', slika_ime)
-        cv.imwrite(out_path, senca)
+        # out_path = os.path.join(output_dir, 'original', slika_ime)
+        # cv.imwrite(out_path, linearizirana)
+        #
+        # rotirana = rotiraj_random(linearizirana, max_kot=15)
+        # out_path = os.path.join(output_dir, 'rotacija', slika_ime)
+        # cv.imwrite(out_path, rotirana)
+        #
+        # suma_slika = dodaj_gaussov_sum(linearizirana, sigma=25)
+        # out_path = os.path.join(output_dir, 'sum', slika_ime)
+        # cv.imwrite(out_path, suma_slika)
+        #
+        # kontrastirana = spremeni_kontrast(linearizirana, 1.5)
+        # out_path = os.path.join(output_dir, 'kontrast', slika_ime)
+        # cv.imwrite(out_path, kontrastirana)
+        #
+        # senca = add_shadow_simple(linearizirana)
+        # out_path = os.path.join(output_dir, 'senca', slika_ime)
+        # cv.imwrite(out_path, senca)
 
         kombinirana = add_shadow_simple(
             spremeni_kontrast(
