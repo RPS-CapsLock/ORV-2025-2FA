@@ -12,14 +12,6 @@ app = Flask(__name__)
 
 known_image = face_recognition.load_image_file("known_face.jpg")
 
-def process_info_for_f2a(incoming_image):
-    try:
-        processed_image = Mod.process_image(incoming_image)
-        return processed_image
-    except Exception as e:
-        print(f"Exception in process_info_for_f2a: {e}")
-        return None
-
 def recognize_face(user_id, incoming_image):
     temp_filename = f"temp_{uuid.uuid4().hex}.jpg"
     incoming_image.save(temp_filename)
@@ -56,14 +48,15 @@ def verify():
         from PIL import Image
         incoming_image = Image.open(image).convert("RGB")
 
-        processed_image = process_info_for_f2a(incoming_image)
-        if processed_image is None:
+        if incoming_image is None:
             return jsonify({"error": "Image processing failed"}), 500
 
-        result = recognize_face(user_id, processed_image)
+        result = recognize_face(user_id, incoming_image)
         if result is None:
             return jsonify({"error": "Recognition failed"}), 500
 
         return jsonify({"verified": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/train", methods=["POST"])
