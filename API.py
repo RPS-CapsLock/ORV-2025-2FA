@@ -75,7 +75,13 @@ def verify():
         from PIL import Image
         incoming_image = Image.open(image).convert("RGB")
 
-        result = recognize_face(user_id, incoming_image)
+        # 🔧 Call your image processing function
+        processed_image = process_info_for_f2a(incoming_image)
+        if processed_image is None:
+            return jsonify({"error": "Image processing failed"}), 500
+
+        # ✅ Use the processed image for recognition
+        result = recognize_face(user_id, processed_image)
         if result is None:
             return jsonify({"error": "Recognition failed"}), 500
 
