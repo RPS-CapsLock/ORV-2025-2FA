@@ -6,12 +6,12 @@ from sklearn.utils import compute_class_weight
 from tensorflow.keras import layers, models
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve
-import albumentations as A
 import cv2
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.applications import MobileNetV2
 import joblib
 from tqdm import tqdm
+from util.image_loader import ImageLoader
 
 if len(sys.argv) < 3 or len(sys.argv) > 4:
     print("Usage: python script.py <OPT> <USERID> <TEST>")
@@ -28,42 +28,6 @@ MISMATCH_PATH = f'./mismatch'
 IMG_SIZE = (128, 128)
 BATCH_SIZE = 5
 
-
-class ImageLoader(tf.keras.utils.Sequence):
-    def __init__(self, image_paths, labels, batch_size=32, img_size=(64, 64), augment=False):
-        self.image_paths = image_paths
-        self.labels = labels
-        self.batch_size = batch_size
-        self.img_size = img_size
-        self.augment = augment
-        self.augmentation = A.Compose([
-            A.Rotate(limit=10),
-            A.RandomBrightnessContrast(p=0.2),
-            A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=0, p=0.2),
-        ])
-
-    def __len__(self):
-        return int(np.ceil(len(self.image_paths) / self.batch_size))
-
-    def __getitem__(self, idx):
-        start = idx * self.batch_size
-        end = min((idx + 1) * self.batch_size, len(self.image_paths))
-        if start >= len(self.image_paths):
-            raise IndexError("Batch index out of range")
-        batch_paths = self.image_paths[start:end]
-        batch_labels = self.labels[start:end]
-        batch_images = []
-        for path in batch_paths:
-            img = cv2.imread(path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = cv2.resize(img, self.img_size)
-            if self.augment:
-                img = self.augmentation(image=img)['image']
-            img = img.astype('float32') / 255.0
-            batch_images.append(img)
-        return np.array(batch_images), np.array(batch_labels)
-
-
 def load_data():
     image_paths, labels = [], []
     for img_file in os.listdir(MISMATCH_PATH):
@@ -77,7 +41,6 @@ def load_data():
     X_train, X_val, y_train, y_val = train_test_split(
         image_paths, labels, test_size=0.2, random_state=42, stratify=labels)
     return X_train, X_val, y_train, y_val
-
 
 def build_model():
     input_shape = (IMG_SIZE[0], IMG_SIZE[1], 3)
@@ -95,7 +58,6 @@ def build_model():
     x = layers.Dropout(0.5)(x)
     x = layers.Dense(1, activation='sigmoid')(x)
     return models.Model(inputs=inputs, outputs=x)
-
 
 def train_and_evaluate():
     print(f"\nTraining model for user: {USERID}")
@@ -169,7 +131,6 @@ def predict(image_path):
     label = 'match' if pred > optimal_threshold else 'mismatch'
     confidence = pred if pred > optimal_threshold else 1 - pred
     print(f"Prediction: {label} with confidence: {confidence:.2f}")
-
 
 if OPT == 'train':
     train_and_evaluate()
