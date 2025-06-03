@@ -17,7 +17,7 @@ def recognize_face(user_id, incoming_image):
     incoming_image.save(temp_filename)
     try:
         result = subprocess.run(
-            ['python', 'script.py', 'use', user_id, temp_filename],
+            ['python', 'main.py', 'use', user_id, temp_filename],
             capture_output=True, text=True
         )
         output = result.stdout.strip()
@@ -60,3 +60,36 @@ def verify():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/train", methods=["POST"])
+def train():
+    data = request.get_json()
+    images_b64 = data.get("images")
+    user_id = data.get("user_id")
+
+    if not images_b64 or not user_id:
+        return jsonify({"error": "Missing images or user_id"}), 400
+
+    user_folder = os.path.join(".", user_id)
+    os.makedirs(user_folder, exist_ok=True)
+
+    try:
+        for i, image_b64 in enumerate(images_b64):
+            image_data = base64.b64decode(image_b64)
+            image = io.BytesIO(image_data)
+            from PIL import Image
+            img = Image.open(image).convert("RGB")
+            img.save(os.path.join(user_folder, f"user_{i}.jpg"))
+
+        result = subprocess.run(
+            ['python', 'main.py', 'train', user_id],
+            capture_output=True, text=True
+        )
+        print(result.stdout)
+        print(result.stderr)
+
+        if result.returncode != 0:
+            return jsonify({"error": "Training failed", "details": result.stderr}), 500
+
+        return jsonify({"message": f"Training successful for {user_id}."})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
