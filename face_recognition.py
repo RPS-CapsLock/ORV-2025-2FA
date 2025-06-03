@@ -13,21 +13,8 @@ from tensorflow.keras.applications import MobileNetV2
 import joblib
 from tqdm import tqdm
 
-if len(sys.argv) < 3 or len(sys.argv) > 4:
-    print("Usage: python script.py <OPT> <USERID> <TEST>")
-    sys.exit(1)
-
-OPT = sys.argv[1]
-USERID = sys.argv[2]
-TEST = ""
-if OPT == 'use':
-    TEST = sys.argv[3]
-
-DATA_PATH = f'./{USERID}'
-MISMATCH_PATH = f'./mismatch'
 IMG_SIZE = (128, 128)
 BATCH_SIZE = 5
-
 
 class ImageLoader(tf.keras.utils.Sequence):
     def __init__(self, image_paths, labels, batch_size=32, img_size=(64, 64), augment=False):
@@ -64,15 +51,15 @@ class ImageLoader(tf.keras.utils.Sequence):
         return np.array(batch_images), np.array(batch_labels)
 
 
-def load_data():
+def load_data(mismatch_path, data_path):
     image_paths, labels = [], []
-    for img_file in os.listdir(MISMATCH_PATH):
+    for img_file in os.listdir(mismatch_path):
         if img_file.lower().endswith(('.png', '.jpg', '.jpeg', '.ppm')):
-            image_paths.append(os.path.join(MISMATCH_PATH, img_file))
+            image_paths.append(os.path.join(mismatch_path, img_file))
             labels.append(0)
-    for img_file in os.listdir(DATA_PATH):
+    for img_file in os.listdir(data_path):
         if img_file.lower().endswith(('.png', '.jpg', '.jpeg', '.ppm')):
-            image_paths.append(os.path.join(DATA_PATH, img_file))
+            image_paths.append(os.path.join(data_path, img_file))
             labels.append(1)
     X_train, X_val, y_train, y_val = train_test_split(
         image_paths, labels, test_size=0.2, random_state=42, stratify=labels)
@@ -97,9 +84,9 @@ def build_model():
     return models.Model(inputs=inputs, outputs=x)
 
 
-def train_and_evaluate():
-    print(f"\nTraining model for user: {USERID}")
-    X_train, X_val, y_train, y_val = load_data()
+def train_and_evaluate(user_id, data_path, mismatch_path = './data/preccessed/kombinirano'):
+    print(f"\nTraining model for user: {user_id}")
+    X_train, X_val, y_train, y_val = load_data(mismatch_path, data_path)
 
     print(f"Train size: {len(X_train)}, Validation size: {len(X_val)}")
 
@@ -110,7 +97,7 @@ def train_and_evaluate():
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=2e-5),
                   loss='binary_crossentropy', metrics=['accuracy'])
 
-    callbacks = [TensorBoard(log_dir=f'logs/{USERID}'),
+    callbacks = [TensorBoard(log_dir=f'logs/{user_id}'),
                  EarlyStopping(patience=10, restore_best_weights=True),
                  ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, verbose=1)]
 
@@ -125,8 +112,8 @@ def train_and_evaluate():
               callbacks=callbacks, class_weight=class_weight_dict,
               steps_per_epoch=steps_per_epoch, validation_steps=validation_steps)
 
-    model.save(f'm_{USERID}.keras')
-    print(f"Model saved as m_{USERID}.keras")
+    model.save(f'm_{user_id}.keras')
+    print(f"Model saved as m_{user_id}.keras")
 
     val_preds, val_labels = [], []
     for batch_x, batch_y in tqdm(val_loader, total=validation_steps, desc="Predicting validation batches"):
@@ -147,13 +134,13 @@ def train_and_evaluate():
     if optimal_threshold < 0.5:
         optimal_threshold = 0.5
     print(f"Optimal threshold: {optimal_threshold}")
-    joblib.dump(optimal_threshold, f'm_{USERID}_threshold.pkl')
-    print(f"Saved threshold as m_{USERID}_threshold.pkl")
+    joblib.dump(optimal_threshold, f'm_{user_id}_threshold.pkl')
+    print(f"Saved threshold as m_{user_id}_threshold.pkl")
 
-def predict(image_path):
-    model = models.load_model(f'm_{USERID}.keras')
+def predict(image_path, user_id):
+    model = models.load_model(f'm_{user_id}.keras')
     try:
-        optimal_threshold = joblib.load(f'm_{USERID}_threshold.pkl')
+        optimal_threshold = joblib.load(f'm_{user_id}_threshold.pkl')
         print(f"Using saved threshold: {optimal_threshold}")
     except:
         optimal_threshold = 0.5
@@ -171,9 +158,9 @@ def predict(image_path):
     print(f"Prediction: {label} with confidence: {confidence:.2f}")
 
 
-if OPT == 'train':
-    train_and_evaluate()
-elif OPT == 'use':
-    predict(TEST)
-else:
-    print("Invalid OPT. Use 'train' or 'use'.")
+def train(user_id):
+    data_path = f'./{user_id}'
+    train_and_evaluate(user_id, data_path)
+
+def use(user_id, test_p):
+    predict(user_id, test_p)

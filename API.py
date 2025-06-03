@@ -1,31 +1,17 @@
 from flask import Flask, request, jsonify
-import numpy as np
 import base64
 import io
 import os
-import main as face_recognition
-import subprocess
+from face_recognition import use, train
 import uuid
-import Mod
 
 app = Flask(__name__)
-
-known_image = face_recognition.load_image_file("known_face.jpg")
 
 def recognize_face(user_id, incoming_image):
     temp_filename = f"temp_{uuid.uuid4().hex}.jpg"
     incoming_image.save(temp_filename)
     try:
-        result = face_recognition.use()
-        output = result.stdout.strip()
-        print(f"Script output:\n{output}")
-
-        if "match" in output:
-            return True
-        elif "mismatch" in output:
-            return False
-        else:
-            return None
+        return use(user_id, temp_filename)
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
@@ -76,14 +62,15 @@ def train():
             img = Image.open(image).convert("RGB")
             img.save(os.path.join(user_folder, f"user_{i}.jpg"))
 
-        result = face_recognition.train(user_id, user_folder)
-        print(result.stdout)
-        print(result.stderr)
+        result = train(user_id)
 
-        if result.returncode != 0:
-            return jsonify({"error": "Training failed", "details": result.stderr}), 500
+        if result == False:
+            return jsonify({"error": "Training failed"}), 500
 
         return jsonify({"message": f"Training successful for {user_id}."})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

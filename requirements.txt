@@ -1,0 +1,10 @@
+numpy
+pandas
+matplotlib
+tensorflow
+scikit-learn
+albumentations
+opencv-python
+focal-loss
+tqdm
+flask
