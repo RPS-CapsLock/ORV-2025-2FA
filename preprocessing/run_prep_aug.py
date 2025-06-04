@@ -1,7 +1,7 @@
 import os
 import cv2 as cv
-from augment import *
-from prep import *
+from .augment import *
+from .prep import *
 
 def procesiraj_in_augmetiraj(input_dir, output_dir):
     augmentacije = ['original', 'rotacija', 'sum', 'kontrast', 'senca', 'kombinirano']
