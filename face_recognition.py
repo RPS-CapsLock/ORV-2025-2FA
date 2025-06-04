@@ -31,6 +31,7 @@ def load_data(mismatch_path, data_path):
         image_paths, labels, test_size=0.2, random_state=42, stratify=labels)
     return X_train, X_val, y_train, y_val
 
+
 def build_model():
     input_shape = (IMG_SIZE[0], IMG_SIZE[1], 3)
     inputs = layers.Input(shape=input_shape)
@@ -48,7 +49,8 @@ def build_model():
     x = layers.Dense(1, activation='sigmoid')(x)
     return models.Model(inputs=inputs, outputs=x)
 
-def train_and_evaluate(user_id, data_path, mismatch_path = './data/preccessed/kombinirano'):
+
+def train_and_evaluate(user_id, data_path, mismatch_path = './data/processed/kombinirano'):
     print(f"\nTraining model for user: {user_id}")
     X_train, X_val, y_train, y_val = load_data(mismatch_path, data_path)
 
@@ -120,6 +122,7 @@ def predict(image_path, user_id):
     label = 'match' if pred > optimal_threshold else 'mismatch'
     confidence = pred if pred > optimal_threshold else 1 - pred
     print(f"Prediction: {label} with confidence: {confidence:.2f}")
+    return True if pred > optimal_threshold else False
 
 def train(user_id):
     data_path = f'./{user_id}'
@@ -128,7 +131,8 @@ def train(user_id):
     output_dir = f'./augmented/{user_id}'
     procesiraj_in_augmetiraj(input_dir, output_dir)
 
-    train_and_evaluate(user_id, data_path)
+    train_and_evaluate(user_id, output_dir)
+    return True
 
 def use(user_id, test_p):
-    predict(user_id, test_p)
+    return predict(test_p, user_id)

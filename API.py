@@ -20,11 +20,16 @@ def recognize_face(user_id, incoming_image):
 @app.route("/verify", methods=["POST"])
 def verify():
     data = request.get_json()
+
     image_b64 = data.get("image")
     user_id = data.get("user_id")
 
     if not image_b64 or not user_id:
         return jsonify({"error": "Missing image or user_id"}), 400
+
+    if image_b64.startswith("data:image/"):
+        image_b64 = image_b64.split(",", 1)[1]
+
     try:
         image_data = base64.b64decode(image_b64)
         image = io.BytesIO(image_data)
@@ -43,7 +48,7 @@ def verify():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/train", methods=["POST"])
-def train():
+def train_route():
     data = request.get_json()
     images_b64 = data.get("images")
     user_id = data.get("user_id")
@@ -51,20 +56,24 @@ def train():
     if not images_b64 or not user_id:
         return jsonify({"error": "Missing images or user_id"}), 400
 
-    user_folder = os.path.join(".", user_id)
+    user_folder = os.path.join(".", str(user_id))
     os.makedirs(user_folder, exist_ok=True)
 
     try:
+        from PIL import Image
+
         for i, image_b64 in enumerate(images_b64):
+            if image_b64.startswith("data:image/"):
+                image_b64 = image_b64.split(",", 1)[1]
+
             image_data = base64.b64decode(image_b64)
             image = io.BytesIO(image_data)
-            from PIL import Image
             img = Image.open(image).convert("RGB")
             img.save(os.path.join(user_folder, f"user_{i}.jpg"))
 
         result = train(user_id)
 
-        if result == False:
+        if not result:
             return jsonify({"error": "Training failed"}), 500
 
         return jsonify({"message": f"Training successful for {user_id}."})
