@@ -44,11 +44,12 @@ def procesiraj_in_augmetiraj(input_dir, output_dir):
             spremeni_kontrast(
                 dodaj_gaussov_sum(
                     rotiraj_random(linearizirana, max_kot=15), sigma=25), 1.5))
+        kombinirana_bgr = cv.cvtColor(kombinirana, cv.COLOR_GRAY2BGR)
         out_path = os.path.join(output_dir, 'kombinirano', slika_ime)
-        cv.imwrite(out_path, kombinirana)
+        cv.imwrite(out_path, kombinirana_bgr)
 
-if __name__ == '__main__':
-    input_dir = "../data/raw"
-    output_dir = "../data/processed"
+    if __name__ == '__main__':
+        input_dir = "../data/raw"
+        output_dir = "../data/processed"
 
-    procesiraj_in_augmetiraj(input_dir, output_dir)
+        procesiraj_in_augmetiraj(input_dir, output_dir)
