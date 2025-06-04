@@ -118,6 +118,11 @@ def predict(image_path, user_id):
     img = img.astype('float32') / 255.0
     img = np.expand_dims(img, axis=0)
 
+    if optimal_threshold < 0.5:
+        optimal_threshold = 0.5
+    elif optimal_threshold > 0.95:
+        optimal_threshold = 0.95
+
     pred = model.predict(img)[0][0]
     label = 'match' if pred > optimal_threshold else 'mismatch'
     confidence = pred if pred > optimal_threshold else 1 - pred
@@ -130,8 +135,9 @@ def train(user_id):
     input_dir = data_path
     output_dir = f'./augmented/{user_id}'
     procesiraj_in_augmetiraj(input_dir, output_dir)
+    data_path = f'./augmented/{user_id}/kombinirano'
 
-    train_and_evaluate(user_id, output_dir)
+    train_and_evaluate(user_id, data_path)
     return True
 
 def use(user_id, test_p):
