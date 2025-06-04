@@ -113,7 +113,8 @@ def predict(image_path, user_id):
         print("Threshold file not found. Using default threshold 0.5")
 
     img = cv2.imread(image_path)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     img = cv2.resize(img, IMG_SIZE)
     img = img.astype('float32') / 255.0
     img = np.expand_dims(img, axis=0)

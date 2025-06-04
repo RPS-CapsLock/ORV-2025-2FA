@@ -18,3 +18,7 @@ train/
 # Datoteke IDE-jev
 .idea/
 .vscode/
+
+augmented/
+
+m_*
