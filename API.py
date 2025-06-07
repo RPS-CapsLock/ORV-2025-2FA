@@ -1,3 +1,5 @@
+import shutil
+
 from flask import Flask, request, jsonify
 import base64
 import io
@@ -8,13 +10,16 @@ import uuid
 app = Flask(__name__)
 
 def recognize_face(user_id, incoming_image):
-    temp_filename = f"temp_{uuid.uuid4().hex}.jpg"
+    temp_uuid = uuid.uuid4().hex
+    os.makedirs(f'./temp_{temp_uuid}', exist_ok=True)
+    temp_filename = f"./temp_{temp_uuid}/temp_{temp_uuid}.jpg"
     incoming_image.save(temp_filename)
+    temp_dir = f"./temp_{temp_uuid}"
     try:
-        return use(user_id, temp_filename)
+        return use(user_id, temp_uuid)
     finally:
         if os.path.exists(temp_filename):
-            os.remove(temp_filename)
+             shutil.rmtree(temp_dir)
 
 
 @app.route("/verify", methods=["POST"])

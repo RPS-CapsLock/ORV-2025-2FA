@@ -16,6 +16,7 @@ from preprocessing.run_prep_aug import procesiraj_in_augmetiraj
 
 IMG_SIZE = (128, 128)
 BATCH_SIZE = 5
+NUM_EPOCHS = 50
 
 def load_data(mismatch_path, data_path):
     image_paths, labels = [], []
@@ -74,7 +75,7 @@ def train_and_evaluate(user_id, data_path, mismatch_path = './data/processed/kom
     validation_steps = len(val_loader)
     print(f"Train batches: {steps_per_epoch}, Validation batches: {validation_steps}")
 
-    model.fit(train_loader, validation_data=val_loader, epochs=150,
+    model.fit(train_loader, validation_data=val_loader, epochs=NUM_EPOCHS,
               callbacks=callbacks, class_weight=class_weight_dict,
               steps_per_epoch=steps_per_epoch, validation_steps=validation_steps)
 
@@ -107,6 +108,10 @@ def predict(image_path, user_id):
     model = models.load_model(f'm_{user_id}.keras')
     try:
         optimal_threshold = joblib.load(f'm_{user_id}_threshold.pkl')
+        if optimal_threshold < 0.5:
+            optimal_threshold = 0.5
+        elif optimal_threshold > 0.8:
+            optimal_threshold = 0.8
         print(f"Using saved threshold: {optimal_threshold}")
     except:
         optimal_threshold = 0.5
@@ -118,11 +123,6 @@ def predict(image_path, user_id):
     img = cv2.resize(img, IMG_SIZE)
     img = img.astype('float32') / 255.0
     img = np.expand_dims(img, axis=0)
-
-    if optimal_threshold < 0.5:
-        optimal_threshold = 0.5
-    elif optimal_threshold > 0.95:
-        optimal_threshold = 0.95
 
     pred = model.predict(img)[0][0]
     label = 'match' if pred > optimal_threshold else 'mismatch'
@@ -141,5 +141,8 @@ def train(user_id):
     train_and_evaluate(user_id, data_path)
     return True
 
-def use(user_id, test_p):
-    return predict(test_p, user_id)
+def use(user_id, t_uuid):
+    test_img = f'aug_{t_uuid}'
+    procesiraj_in_augmetiraj(f'temp_{t_uuid}', test_img)
+    test_img = f'aug_{t_uuid}/kombinirano/temp_{t_uuid}.jpg'
+    return predict(test_img, user_id)

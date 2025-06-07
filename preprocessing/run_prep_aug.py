@@ -43,7 +43,7 @@ def procesiraj_in_augmetiraj(input_dir, output_dir):
         kombinirana = add_shadow_simple(
             spremeni_kontrast(
                 dodaj_gaussov_sum(
-                    rotiraj_random(linearizirana, max_kot=15), sigma=25), 1.5))
+                    rotiraj_random(linearizirana, max_kot=15), sigma=5), 1.1))
         kombinirana_bgr = cv.cvtColor(kombinirana, cv.COLOR_GRAY2BGR)
         out_path = os.path.join(output_dir, 'kombinirano', slika_ime)
         cv.imwrite(out_path, kombinirana_bgr)
