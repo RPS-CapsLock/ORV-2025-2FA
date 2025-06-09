@@ -54,20 +54,7 @@ Program se zažene in začne poslušati zahteve na naslovu:
 To je lokalni naslov vašega računalnika (localhost).
 
 ---------------------------------------------------------------------------------
-5. Kako uporabljam aplikacijo?
----------------------------------------------------------------------------------
-
-Odprite spletni brskalnik in obiščite:
-
-   http://127.0.0.1:8000/docs
-
-Videli boste interaktivno dokumentacijo, kjer lahko:
-
-- Naložite več slik svojega obraza, da se sistem nauči prepoznavati vaš obraz (endpoint `/train`)
-- Pošljete novo sliko za preverjanje, če je vaš obraz na njej (endpoint `/verify`)
-
----------------------------------------------------------------------------------
-6. Kaj če želim zagnati aplikacijo v Docker okolju?
+4. Kaj če želim zagnati aplikacijo v Docker okolju?
 ---------------------------------------------------------------------------------
 
 Docker omogoča enostaven zagon aplikacij v izoliranem okolju.
@@ -83,7 +70,7 @@ b) Zaženite:
 Sedaj bo aplikacija na voljo na istem naslovu kot prej.
 
 ---------------------------------------------------------------------------------
-7. Pogoste težave in rešitve
+5. Pogoste težave in rešitve
 ---------------------------------------------------------------------------------
 
 - **Napaka:** pip ni prepoznan
@@ -94,14 +81,4 @@ Sedaj bo aplikacija na voljo na istem naslovu kot prej.
 
 - **Aplikacija ni dosegljiva na http://127.0.0.1:8000**
   - Rešitev: Preverite, da ste aplikacijo pravilno zagnali z `python main.py`.
-
----------------------------------------------------------------------------------
-8. Kontakt in podpora
----------------------------------------------------------------------------------
-
-Za pomoč se obrnite na razvijalca ali preglejte dodatno dokumentacijo v mapi `docs`.
-
----
-
-Hvala, ker uporabljate ORV-2FA!
 
