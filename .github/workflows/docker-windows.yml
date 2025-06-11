@@ -1,22 +1,32 @@
-name: Docker Flask API on Windows
+name: Run Flask API without Docker
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-and-run:
+  run-flask-api:
     runs-on: self-hosted
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build -t flask-api .
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Run Docker container
-        run: docker run -d -p 5000:5000 --name flask-api-container flask-api
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start Flask API
+        shell: powershell
+        run: |
+          $env:FLASK_APP = "API.py"
+          $env:FLASK_ENV = "development"
+          Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle Hidden", "-Command", "flask run --host=127.0.0.1 --port=5000" -PassThru | Set-Content -Path flask_process.txt
+          Start-Sleep -Seconds 3
 
       - name: Wait for API to start
         shell: powershell
@@ -25,7 +35,7 @@ jobs:
           $i = 0
           do {
             try {
-              $resp = Invoke-WebRequest -Uri http://localhost:5000/health -UseBasicParsing -TimeoutSec 3
+              $resp = Invoke-WebRequest -Uri http://127.0.0.1:5000/health -UseBasicParsing -TimeoutSec 3
               if ($resp.StatusCode -eq 200) {
                 Write-Host "API is up!"
                 break
@@ -45,20 +55,18 @@ jobs:
         shell: powershell
         run: |
           $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("test-data/face.jpg"))
-          Write-Host "Encoded image length: $($b64.Length)"
           echo "IMAGE_B64=$b64" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Test /verify endpoint
         shell: powershell
         run: |
-          $json = @{ user_id = "test"; image = $env:IMAGE_B64 } | ConvertTo-Json
-          Write-Host "Sending POST to /verify..."
-          $response = Invoke-RestMethod -Uri http://localhost:5000/verify -Method POST -Body $json -ContentType "application/json"
+          $json = @{ user_id = "test"; image = $env:IMAGE_B64 } | ConvertTo-Json -Depth 10
+          $response = Invoke-RestMethod -Uri http://127.0.0.1:5000/verify -Method POST -Body $json -ContentType "application/json"
           Write-Host "Response from API:"
-          Write-Host $response | ConvertTo-Json -Depth 10
+          $response | ConvertTo-Json -Depth 10
 
-      - name: Stop container
-        run: docker stop flask-api-container
-
-      - name: Remove container
-        run: docker rm flask-api-container
+      - name: Kill Flask API
+        shell: powershell
+        run: |
+          $proc = Get-Content flask_process.txt
+          Stop-Process -Id $proc.Id -Force
