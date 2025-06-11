@@ -25,13 +25,16 @@ jobs:
         run: |
           $env:FLASK_APP = "API.py"
           $env:FLASK_ENV = "development"
-          Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle Hidden", "-Command", "flask run --host=127.0.0.1 --port=5000" -PassThru | Set-Content -Path flask_process.txt
-          Start-Sleep -Seconds 3
+          # Start Flask and redirect stdout+stderr to flask.log
+          $proc = Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle Hidden", "-Command", "flask run --host=127.0.0.1 --port=5000 > flask.log 2>&1" -PassThru
+          # Save the PID to a file for later killing
+          $proc.Id | Set-Content -Path flask_process.txt
+          Start-Sleep -Seconds 6  # wait longer for Flask to start
 
       - name: Wait for API to start
         shell: powershell
         run: |
-          $maxRetries = 10
+          $maxRetries = 20
           $i = 0
           do {
             try {
@@ -48,6 +51,8 @@ jobs:
           } while ($i -lt $maxRetries)
           if ($i -eq $maxRetries) {
             Write-Error "API did not start in time"
+            # Output the flask log for debugging
+            Get-Content flask.log
             exit 1
           }
 
@@ -68,5 +73,5 @@ jobs:
       - name: Kill Flask API
         shell: powershell
         run: |
-          $proc = Get-Content flask_process.txt
-          Stop-Process -Id $proc.Id -Force
+          $pid = Get-Content flask_process.txt
+          Stop-Process -Id $pid -Force
