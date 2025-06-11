@@ -81,7 +81,7 @@ def train_route():
         if not result:
             return jsonify({"error": "Training failed"}), 500
 
-        return jsonify({"message": f"Training successful for {user_id}."})
+        return jsonify({"message": f"Training successful for the {user_id}."})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
