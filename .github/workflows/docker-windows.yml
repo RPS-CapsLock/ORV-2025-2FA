@@ -45,7 +45,7 @@ jobs:
               }
             } catch {
               Write-Host "Waiting for API to start..."
-              Start-Sleep -Seconds 3
+              Start-Sleep -Seconds 10
             }
             $i++
           } while ($i -lt $maxRetries)
